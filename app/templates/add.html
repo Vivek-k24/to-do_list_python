@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="mt-4">Add TODO</h1>
+<form method="POST" action="{{ url_for('add') }}">
+    <div class="mb-3">
+        <label for="title" class="form-label">Title</label>
+        <input
+            type="text"
+            class="form-control"
+            id="title"
+            name="title"
+            required
+        >
+    </div>
+
+    <div class="mb-3">
+        <label for="due_date" class="form-label">Due Date</label>
+        <input
+            type="date"
+            class="form-control"
+            id="due_date"
+            name="due_date"
+        >
+    </div>
+
+    <div class="mb-3">
+        <label for="due_time" class="form-label">Due Time</label>
+        <input
+            type="time"
+            class="form-control"
+            id="due_time"
+            name="due_time"
+        >
+    </div>
+
+    <div class="mb-3">
+        <label for="notes" class="form-label">Notes</label>
+        <textarea
+            class="form-control"
+            id="notes"
+            name="notes"
+            rows="4"
+            placeholder="Enter any additional information here..."
+        ></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Add</button>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}
