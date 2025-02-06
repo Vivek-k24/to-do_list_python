@@ -1,0 +1,103 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          # If AWS creds are set as secrets (below),
+          # this action automatically uses them.
+          region: ${{ secrets.AWS_REGION }}
+
+      - name: Build TODO Service image
+        run: |
+          cd todo_service
+          docker build -t todo_service:latest .
+
+      - name: Test TODO Service
+        run: |
+          cd todo_service
+          # If you have tests, e.g. "pytest tests/"
+          # For now, if no tests, skip this step or just echo
+          echo "Running tests for TODO Service..."
+          # pytest tests/
+
+      - name: Build Reminder Service image
+        run: |
+          cd reminder_service
+          docker build -t reminder_service:latest .
+
+      - name: Test Reminder Service
+        run: |
+          cd reminder_service
+          echo "Running tests for Reminder Service..."
+          # pytest tests/
+
+  push-to-ecr-and-deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'    # Only deploy when pushing/merging into main
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # ---------------------------------------------
+      # 1) Tag & Push the images to ECR
+      # ---------------------------------------------
+      - name: Tag & Push TODO Service
+        run: |
+          docker tag todo_service:latest ${{ secrets.ECR_REPO_TODO }}:latest
+          docker push ${{ secrets.ECR_REPO_TODO }}:latest
+
+      - name: Tag & Push Reminder Service
+        run: |
+          docker tag reminder_service:latest ${{ secrets.ECR_REPO_REMINDER }}:latest
+          docker push ${{ secrets.ECR_REPO_REMINDER }}:latest
+
+      # ---------------------------------------------
+      # 2) Deploy to EKS using kubectl
+      # ---------------------------------------------
+      - name: Update Kubeconfig
+        # This step uses the same AWS credentials
+        # to retrieve cluster info & write a kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+
+      - name: Set Todo Service image
+        run: |
+          kubectl set image deployment/todo-deployment todo-container=${{ secrets.ECR_REPO_TODO }}:latest
+
+      - name: Set Reminder Service image
+        run: |
+          kubectl set image deployment/reminder-deployment reminder-container=${{ secrets.ECR_REPO_REMINDER }}:latest
+
+      # Alternatively, re-apply the entire manifests if they reference the :latest tag in the YAML
+      # - name: kubectl apply
+      #   run: |
+      #     kubectl apply -f k8s/
