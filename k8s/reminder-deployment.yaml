@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reminder-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reminder-service
+  template:
+    metadata:
+      labels:
+        app: reminder-service
+    spec:
+      containers:
+      - name: reminder-container
+        image: 644811281370.dkr.ecr.us-east-1.amazonaws.com/reminder-service:latest
+        env:
+          - name: TODO_API_URL
+            value: "http://todo-service/api/due_soon"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

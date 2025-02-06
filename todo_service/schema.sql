@@ -4,5 +4,8 @@ CREATE TABLE IF NOT EXISTS todo (
     due_date TEXT,
     due_time TEXT,
     notes TEXT,
+    remind integer DEFAULT 0,
     "order" INTEGER UNIQUE NOT NULL
 );
+
+
