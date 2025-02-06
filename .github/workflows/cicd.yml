@@ -18,12 +18,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Remove the 'region' input here, since aws-actions/amazon-ecr-login@v1
+      # does not support 'region' as an input.
+      # If you're NOT pulling private ECR images in this job, you can omit this login entirely.
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
-        with:
-          # If AWS creds are set as secrets (below),
-          # this action automatically uses them.
-          region: ${{ secrets.AWS_REGION }}
 
       - name: Build TODO Service image
         run: |
@@ -33,8 +32,6 @@ jobs:
       - name: Test TODO Service
         run: |
           cd todo_service
-          # If you have tests, e.g. "pytest tests/"
-          # For now, if no tests, skip this step or just echo
           echo "Running tests for TODO Service..."
           # pytest tests/
 
@@ -52,7 +49,7 @@ jobs:
   push-to-ecr-and-deploy:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'    # Only deploy when pushing/merging into main
+    if: github.ref == 'refs/heads/main'    # Only deploy on pushes/merges to main
     steps:
       - name: Check out the code
         uses: actions/checkout@v3
@@ -84,8 +81,6 @@ jobs:
       # 2) Deploy to EKS using kubectl
       # ---------------------------------------------
       - name: Update Kubeconfig
-        # This step uses the same AWS credentials
-        # to retrieve cluster info & write a kubeconfig
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
@@ -97,7 +92,7 @@ jobs:
         run: |
           kubectl set image deployment/reminder-deployment reminder-container=${{ secrets.ECR_REPO_REMINDER }}:latest
 
-      # Alternatively, re-apply the entire manifests if they reference the :latest tag in the YAML
+      # Alternatively, if your manifests reference the :latest tag,
+      # you can apply them directly:
       # - name: kubectl apply
-      #   run: |
-      #     kubectl apply -f k8s/
+      #   run: kubectl apply -f k8s/
