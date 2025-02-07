@@ -18,11 +18,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Remove the 'region' input here, since aws-actions/amazon-ecr-login@v1
-      # does not support 'region' as an input.
-      # If you're NOT pulling private ECR images in this job, you can omit this login entirely.
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}  # Add AWS_REGION from secrets
 
       - name: Build TODO Service image
         run: |
@@ -49,7 +48,7 @@ jobs:
   push-to-ecr-and-deploy:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'    # Only deploy on pushes/merges to main
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Check out the code
         uses: actions/checkout@v3
@@ -64,9 +63,6 @@ jobs:
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      # ---------------------------------------------
-      # 1) Tag & Push the images to ECR
-      # ---------------------------------------------
       - name: Tag & Push TODO Service
         run: |
           docker tag todo_service:latest ${{ secrets.ECR_REPO_TODO }}:latest
@@ -77,9 +73,6 @@ jobs:
           docker tag reminder_service:latest ${{ secrets.ECR_REPO_REMINDER }}:latest
           docker push ${{ secrets.ECR_REPO_REMINDER }}:latest
 
-      # ---------------------------------------------
-      # 2) Deploy to EKS using kubectl
-      # ---------------------------------------------
       - name: Update Kubeconfig
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
@@ -91,8 +84,3 @@ jobs:
       - name: Set Reminder Service image
         run: |
           kubectl set image deployment/reminder-deployment reminder-container=${{ secrets.ECR_REPO_REMINDER }}:latest
-
-      # Alternatively, if your manifests reference the :latest tag,
-      # you can apply them directly:
-      # - name: kubectl apply
-      #   run: kubectl apply -f k8s/
