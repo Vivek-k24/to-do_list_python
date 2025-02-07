@@ -3,7 +3,7 @@ import sys
 
 from flask import Flask, render_template, request, redirect, url_for
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -156,10 +156,47 @@ def delete(id):
     conn.close()
     return redirect(url_for('index'))
 
+@app.route('/api/due_soon', methods=['GET'])
+def due_soon():
+    """
+    API endpoint for the reminder microservice to query tasks 
+    that have 'remind=1' and are due within the next 5 minutes.
+    Returns JSON data.
+    """
+    now = datetime.now()
+    in_five_minutes = now + timedelta(minutes=5)
+
+    # Convert 'now' and 'in_five_minutes' to MM/DD/YYYY HH:MM for comparison
+    # We'll do a naive approach: parse each record's due_date+due_time and compare in Python
+    conn = get_db_connection()
+    rows = conn.execute('SELECT * FROM todo WHERE remind=1').fetchall()
+
+    results = []
+    for row in rows:
+        if row['due_date'] and row['due_time']:
+            # Row due date/time is in format mm/dd/yyyy and hh:mm
+            dt_str = f"{row['due_date']} {row['due_time']}"
+            try:
+                due_dt = datetime.strptime(dt_str, '%m/%d/%Y %H:%M')
+                if now <= due_dt <= in_five_minutes:
+                    results.append({
+                        'id': row['id'],
+                        'title': row['title'],
+                        'due_date': row['due_date'],
+                        'due_time': row['due_time'],
+                        'notes': row['notes']
+                    })
+            except ValueError:
+                # Malformed date/time, ignore or log
+                pass
+
+    conn.close()
+    return {'due_soon': results}
+
 # If running directly (not via a WSGI server), run the Flask dev server
 if __name__ == '__main__':
-    # Initialize DB if needed (run once to set up schema, or handle externally)
     if not os.path.exists(DATABASE):
         init_db()
+    # Listen on all interfaces, port 5000
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
-    app.run(debug=True)
